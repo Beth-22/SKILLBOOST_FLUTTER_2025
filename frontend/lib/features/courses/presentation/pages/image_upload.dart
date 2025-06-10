@@ -1,0 +1,181 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:skill_boost/core/widgets/admin_custom_bottom_nav_bar.dart';
+import 'package:skill_boost/core/widgets/custom_button.dart';
+import 'package:dotted_border/dotted_border.dart';
+import 'package:skill_boost/features/courses/presentation/providers/course_provider.dart';
+import 'package:skill_boost/features/courses/presentation/providers/course_event.dart';
+
+class ImageUploadPage extends ConsumerStatefulWidget {
+  const ImageUploadPage({super.key});
+
+  @override
+  ConsumerState<ImageUploadPage> createState() => _ImageUploadPageState();
+}
+
+class _ImageUploadPageState extends ConsumerState<ImageUploadPage> {
+  XFile? _selectedImage;
+  bool _isUploading = false;
+  late String courseId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Get the courseId from the arguments
+    courseId = ModalRoute.of(context)!.settings.arguments as String;
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (image != null) {
+        setState(() {
+          _selectedImage = image;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _submit() async {
+    setState(() {
+      _isUploading = true;
+    });
+    try {
+      if (_selectedImage != null) {
+        await ref.read(courseProvider.notifier).mapEventToState(
+          UploadCourseImageEvent(courseId, _selectedImage!.path),
+        );
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Course image uploaded successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      // Go to admin home page
+      Navigator.pushNamedAndRemoveUntil(context, '/admin-home', (route) => false);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error uploading image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      bottomNavigationBar: AdminCustomBottomNavBar(currentIndex: 1),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(color: Color(0xFF9B6ED8)),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Upload Course Image',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 20,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: 352,
+              height: 160,
+              child: DottedBorder(
+                options: RectDottedBorderOptions(
+                  color: const Color(0xFF884FD0),
+                  strokeWidth: 1,
+                  dashPattern: const [6, 4],
+                ),
+                child: InkWell(
+                  onTap: _pickImage,
+                  child: Center(
+                    child: _selectedImage != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.file(
+                              File(_selectedImage!.path),
+                              width: 352,
+                              height: 160,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.add_photo_alternate,
+                                color: Color(0xFF884FD0),
+                                size: 40,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Upload Course Image',
+                                style: GoogleFonts.inter(
+                                  color: const Color(0xFF884FD0),
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
+            if (_isUploading)
+              const CircularProgressIndicator()
+            else
+              CustomButton(
+                label: 'Save',
+                onTap: _submit,
+                textColor: Colors.white,
+                backgroundColor: const Color(0xFF884FD0),
+                borderRadius: 6,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
